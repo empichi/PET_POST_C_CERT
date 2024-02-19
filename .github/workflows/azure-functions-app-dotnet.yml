@@ -1,0 +1,65 @@
+using System;
+using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        // La URL a la que quieres hacer la petición POST
+        var url = "https://www.ejemplo.com";
+
+        // Los datos que quieres enviar en formato JSON
+        var data = new
+        {
+            Propiedad1 = "Valor1",
+            Propiedad2 = "Valor2"
+        };
+
+        // Convertir los datos a JSON
+        var jsonData = JsonConvert.SerializeObject(data);
+
+        // Crear un HttpClientHandler para añadir el certificado
+        var handler = new HttpClientHandler();
+        var certificate = new X509Certificate2("ruta/a/tu/certificado.p12", "tuContraseña");
+        handler.ClientCertificates.Add(certificate);
+
+        try
+        {
+            // Crear el HttpClient con el handler
+            using (var client = new HttpClient(handler))
+            {
+                // Establecer encabezados de la petición si es necesario, por ejemplo, el ContentType
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+
+                // Realizar la petición POST
+                var response = await client.PostAsync(url, new StringContent(jsonData, Encoding.UTF8, "application/json"));
+
+                // Asegurarse de que la petición fue exitosa
+                response.EnsureSuccessStatusCode();
+
+                // Leer la respuesta como un string
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                // Opcional: Deserializar la respuesta JSON si necesitas manejarla como objeto
+                var responseObject = JsonConvert.DeserializeObject(responseString);
+
+                // Aquí puedes trabajar con la respuesta, por ejemplo, imprimirla
+                Console.WriteLine(responseString);
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            // Control de errores de la petición HTTP
+            Console.WriteLine($"Error haciendo la petición: {e.Message}");
+        }
+        catch (Exception e)
+        {
+            // Control de otros errores
+            Console.WriteLine($"Error general: {e.Message}");
+        }
+    }
+}
