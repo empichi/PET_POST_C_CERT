@@ -63,3 +63,140 @@ class Program
         }
     }
 }
+
+
+
+
+
+using System;
+using System.IO;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        var url = "https://www.ejemplo.com";
+        var data = "{\"Propiedad1\":\"Valor1\",\"Propiedad2\":\"Valor2\"}";
+
+        var request = (HttpWebRequest)WebRequest.Create(url);
+        request.Method = "POST";
+        request.ContentType = "application/json";
+        request.ContentLength = data.Length;
+
+        // Añadir el certificado
+        var certificate = new X509Certificate2("ruta/a/tu/certificado.p12", "tuContraseña");
+        request.ClientCertificates.Add(certificate);
+
+        // Escribir los datos en el cuerpo de la solicitud
+        using (var streamWriter = new StreamWriter(request.GetRequestStream()))
+        {
+            streamWriter.Write(data);
+        }
+
+        // Obtener la respuesta
+        try
+        {
+            using (var response = (HttpWebResponse)request.GetResponse())
+            {
+                using (var streamReader = new StreamReader(response.GetResponseStream()))
+                {
+                    var result = streamReader.ReadToEnd();
+                    Console.WriteLine(result);
+                }
+            }
+        }
+        catch (WebException e)
+        {
+            Console.WriteLine($"Error haciendo la petición: {e.Message}");
+            if (e.Response != null)
+            {
+                using (var streamReader = new StreamReader(e.Response.GetResponseStream()))
+                {
+                    var errorResponse = streamReader.ReadToEnd();
+                    Console.WriteLine($"Respuesta del servidor: {errorResponse}");
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+using System;
+using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        var url = "https://www.ejemplo.com";
+
+        var data = new
+        {
+            Propiedad1 = "Valor1",
+            Propiedad2 = "Valor2"
+        };
+
+        var jsonData = JsonConvert.SerializeObject(data);
+
+        var handler = new HttpClientHandler();
+        var certificate = FindCertificateBySubjectName("CN=NombreComunDelCertificado");
+        if (certificate != null)
+        {
+            handler.ClientCertificates.Add(certificate);
+        }
+        else
+        {
+            Console.WriteLine("Certificado no encontrado.");
+            return;
+        }
+
+        try
+        {
+            using (var client = new HttpClient(handler))
+            {
+                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await client.PostAsync(url, new StringContent(jsonData, Encoding.UTF8, "application/json"));
+                response.EnsureSuccessStatusCode();
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                Console.WriteLine(responseString);
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            Console.WriteLine($"Error haciendo la petición: {e.Message}");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Error general: {e.Message}");
+        }
+    }
+
+    private static X509Certificate2 FindCertificateBySubjectName(string subjectName)
+    {
+        using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+        {
+            store.Open(OpenFlags.ReadOnly);
+            var certificates = store.Certificates.Find(X509FindType.FindBySubjectName, subjectName, false);
+            if (certificates.Count > 0)
+            {
+                return certificates[0];
+            }
+            return null;
+        }
+    }
+}
